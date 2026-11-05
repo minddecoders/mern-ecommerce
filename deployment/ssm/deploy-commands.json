@@ -1,6 +1,6 @@
 {
     "commands": [
-        "set -Eeuo pipefail",
+        "set -e",
         "mkdir -p /opt/mern-ecommerce",
         "if [ ! -d /opt/mern-ecommerce/.git ]; then git clone https://github.com/minddecoders/mern-ecommerce.git /opt/mern-ecommerce; fi",
         "cd /opt/mern-ecommerce",
