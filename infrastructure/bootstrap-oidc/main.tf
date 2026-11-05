@@ -168,6 +168,8 @@ data "aws_iam_policy_document" "terraform_permissions" {
     actions = [
       "iam:CreateRole",
       "iam:DeleteRole",
+      "iam:DeleteRolePolicy",
+       "iam:PutRolePolicy",
       "iam:GetRole",
       "iam:UpdateAssumeRolePolicy",
       "iam:TagRole",
