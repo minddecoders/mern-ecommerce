@@ -13,7 +13,7 @@ apt-get install -y \
   curl \
   gnupg \
   awscli \
-  snapd
+  snapd git
 
 # Add Docker official repository
 install -m 0755 -d /etc/apt/keyrings

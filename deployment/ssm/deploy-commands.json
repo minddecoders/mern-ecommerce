@@ -1,0 +1,13 @@
+{
+    "commands": [
+        "set -Eeuo pipefail",
+        "mkdir -p /opt/mern-ecommerce",
+        "if [ ! -d /opt/mern-ecommerce/.git ]; then git clone https://github.com/minddecoders/mern-ecommerce.git /opt/mern-ecommerce; fi",
+        "cd /opt/mern-ecommerce",
+        "git fetch origin",
+        "git checkout --force COMMIT_SHA",
+        "git reset --hard COMMIT_SHA",
+        "chmod +x deployment/scripts/*.sh",
+        "bash deployment/scripts/deploy.sh COMMIT_SHA"
+    ]
+}

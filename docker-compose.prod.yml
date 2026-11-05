@@ -1,0 +1,72 @@
+services:
+  mongo:
+    image: mongo:4.2.24
+    container_name: mern-mongodb
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongo
+        - --quiet
+        - --eval
+        - "db.adminCommand('ping').ok"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  server:
+    image: ${ECR_SERVER_IMAGE:?ECR_SERVER_IMAGE is required}
+    container_name: mern-server
+    env_file:
+      - deployment/.env.production
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('net').connect(3000,'127.0.0.1').on('connect',function(){process.exit(0)}).on('error',function(){process.exit(1)})"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  client:
+    image: ${ECR_CLIENT_IMAGE:?ECR_CLIENT_IMAGE is required}
+    container_name: mern-client
+    ports:
+      - "80:8080"
+    depends_on:
+      server:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-network
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - -q
+        - --spider
+        - http://127.0.0.1:8080/
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mongo-data:
+
+networks:
+  app-network:
+    driver: bridge

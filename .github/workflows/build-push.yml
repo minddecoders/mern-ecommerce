@@ -1,0 +1,87 @@
+
+name: Build and Push MERN Images
+
+on:
+  workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: "Optional 40-character commit SHA (blank = current selected branch)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  AWS_ACCOUNT_ID: "951614974272"
+  ECR_CLIENT_REPOSITORY: mern-learning-client
+  ECR_SERVER_REPOSITORY: mern-learning-server
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha || github.sha }}
+
+      
+      - name: Determine checked-out commit
+        id: commit
+        run: |
+          COMMIT_SHA=$(git rev-parse HEAD)
+
+          if [[ ! "$COMMIT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "Invalid commit SHA."
+            exit 1
+          fi
+
+          echo "sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
+
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: MernLearningImageBuild
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image references
+        id: image
+        run: |
+          REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+          TAG="release-${{ steps.commit.outputs.sha }}"
+
+          echo "client=${REGISTRY}/${ECR_CLIENT_REPOSITORY}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "server=${REGISTRY}/${ECR_SERVER_REPOSITORY}:${TAG}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push client
+        uses: docker/build-push-action@v6
+        with:
+          context: ./client
+          push: true
+          tags: ${{ steps.image.outputs.client }}
+          build-args: |
+            API_URL=/api
+
+      - name: Build and push server
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          push: true
+          tags: ${{ steps.image.outputs.server }}
+
+      - name: Display pushed image references
+        run: |
+          echo "Client: ${{ steps.image.outputs.client }}"
+          echo "Server: ${{ steps.image.outputs.server }}"
+          echo "Commit SHA: ${{ steps.commit.outputs.sha }}"

@@ -1,0 +1,52 @@
+
+name: Deployment Access Preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  preflight:
+    name: Verify Deployment Access
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: MernLearningDeploymentPreflight
+
+      - name: Verify AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Verify ECR repositories
+        run: |
+          aws ecr describe-repositories \
+            --repository-names mern-learning-client mern-learning-server \
+            --region "${{ vars.AWS_REGION }}"
+
+      - name: Verify EC2 SSM registration
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+        run: |
+          if [[ -z "$INSTANCE_ID" ]]; then
+            echo "Set the EC2_INSTANCE_ID GitHub variable after infrastructure creation."
+            exit 1
+          fi
+
+          STATUS=$(aws ssm describe-instance-information \
+            --filters "Key=InstanceIds,Values=${INSTANCE_ID}" \
+            --query 'InstanceInformationList[0].PingStatus' \
+            --output text)
+
+          if [[ "$STATUS" != "Online" ]]; then
+            echo "EC2 is not online in Systems Manager: ${STATUS}"
+            exit 1
+          fi
+
+          echo "EC2 is registered and online in SSM."

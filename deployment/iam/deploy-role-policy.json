@@ -1,0 +1,56 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "ECRAuthentication",
+            "Effect": "Allow",
+            "Action": "ecr:GetAuthorizationToken",
+            "Resource": "*"
+        },
+        {
+            "Sid": "PushProjectImages",
+            "Effect": "Allow",
+            "Action": [
+                "ecr:BatchCheckLayerAvailability",
+                "ecr:CompleteLayerUpload",
+                "ecr:InitiateLayerUpload",
+                "ecr:PutImage",
+                "ecr:UploadLayerPart",
+                "ecr:DescribeRepositories",
+                "ecr:DescribeImages"
+            ],
+            "Resource": [
+                "arn:aws:ecr:eu-west-1:951614974272:repository/mern-learning-client",
+                "arn:aws:ecr:eu-west-1:951614974272:repository/mern-learning-server"
+            ]
+        },
+        {
+            "Sid": "FindEC2AndSSMInstance",
+            "Effect": "Allow",
+            "Action": [
+                "ec2:DescribeInstances",
+                "ssm:DescribeInstanceInformation"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "SendDeploymentCommand",
+            "Effect": "Allow",
+            "Action": "ssm:SendCommand",
+            "Resource": [
+                "arn:aws:ssm:eu-west-1::document/AWS-RunShellScript",
+                "arn:aws:ec2:eu-west-1:951614974272:instance/*"
+            ]
+        },
+        {
+            "Sid": "ReadDeploymentCommandStatus",
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetCommandInvocation",
+                "ssm:ListCommandInvocations",
+                "ssm:ListCommands"
+            ],
+            "Resource": "*"
+        }
+    ]
+}
