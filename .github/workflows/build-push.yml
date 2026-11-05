@@ -30,7 +30,6 @@ jobs:
         with:
           ref: ${{ inputs.commit_sha || github.sha }}
 
-      
       - name: Determine checked-out commit
         id: commit
         run: |
@@ -42,7 +41,6 @@ jobs:
           fi
 
           echo "sha=${COMMIT_SHA}" >> "$GITHUB_OUTPUT"
-
 
       - name: Configure AWS credentials using OIDC
         uses: aws-actions/configure-aws-credentials@v4
@@ -64,7 +62,41 @@ jobs:
           echo "server=${REGISTRY}/${ECR_SERVER_REPOSITORY}:${TAG}" >> "$GITHUB_OUTPUT"
           echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
+      - name: Check existing ECR images
+        id: check
+        run: |
+          TAG="${{ steps.image.outputs.tag }}"
+
+          check_image() {
+            local repository="$1"
+            local output="$2"
+            local error
+
+            if aws ecr describe-images \
+              --repository-name "$repository" \
+              --image-ids "imageTag=$TAG" >/dev/null 2>&1; then
+              echo "$output=true" >> "$GITHUB_OUTPUT"
+              echo "$repository image already exists. Skipping build."
+            else
+              if error=$(aws ecr describe-images \
+                --repository-name "$repository" \
+                --image-ids "imageTag=$TAG" 2>&1); then
+                echo "$output=true" >> "$GITHUB_OUTPUT"
+              elif [[ "$error" == *"ImageNotFoundException"* ]]; then
+                echo "$output=false" >> "$GITHUB_OUTPUT"
+                echo "$repository image does not exist. Build required."
+              else
+                echo "$error"
+                exit 1
+              fi
+            fi
+          }
+
+          check_image "$ECR_CLIENT_REPOSITORY" client_exists
+          check_image "$ECR_SERVER_REPOSITORY" server_exists
+
       - name: Build and push client
+        if: steps.check.outputs.client_exists != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./client
@@ -74,13 +106,14 @@ jobs:
             API_URL=/api
 
       - name: Build and push server
+        if: steps.check.outputs.server_exists != 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./server
           push: true
           tags: ${{ steps.image.outputs.server }}
 
-      - name: Display pushed image references
+      - name: Display image references
         run: |
           echo "Client: ${{ steps.image.outputs.client }}"
           echo "Server: ${{ steps.image.outputs.server }}"
