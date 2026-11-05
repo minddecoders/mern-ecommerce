@@ -52,6 +52,14 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
 
+      - name: Verify ECR configuration
+        run: |
+          pwd
+          grep -R -n "force_delete" .
+
+      - name: Verify Terraform version
+        run: terraform version
+
       - name: Terraform Destroy Plan
         run: terraform plan -destroy -input=false -out=destroy.tfplan
 
