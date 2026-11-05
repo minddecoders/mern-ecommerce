@@ -23,7 +23,11 @@ jobs:
         working-directory: infrastructure/terraform
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Require explicit confirmation
+        working-directory: .
         env:
           CONFIRMATION: ${{ inputs.confirmation }}
         run: |
@@ -31,9 +35,6 @@ jobs:
             echo "You must type DESTROY exactly."
             exit 1
           fi
-
-      - name: Checkout repository
-        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
