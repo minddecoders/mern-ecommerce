@@ -16,13 +16,19 @@ fi
 
 echo "Restoring previous image references..."
 
-cp "${BACKUP_FILE}" "${ENV_FILE}"
-chmod 600 "${ENV_FILE}"
+TEMP_ENV="$(mktemp "${DEPLOYMENT_DIR}/deployment.env.rollback.XXXXXX")"
+cp "${BACKUP_FILE}" "${TEMP_ENV}"
+chmod 600 "${TEMP_ENV}"
+mv "${TEMP_ENV}" "${ENV_FILE}"
+
+echo "Pulling previous images..."
 
 docker compose \
   --env-file "${ENV_FILE}" \
   -f docker-compose.prod.yml \
   pull
+
+echo "Starting previous application..."
 
 docker compose \
   --env-file "${ENV_FILE}" \

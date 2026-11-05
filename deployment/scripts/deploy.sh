@@ -21,7 +21,6 @@ if [[ ! "${IMAGE_TAG}" =~ ^[0-9a-f]{40}$ ]]; then
 fi
 
 cd "${APP_DIR}"
-
 mkdir -p "${DEPLOYMENT_DIR}"
 
 echo "Retrieving production environment from Parameter Store..."
@@ -36,16 +35,15 @@ aws ssm get-parameter \
 chmod 600 "${PRODUCTION_ENV}"
 
 if ! grep -q '^JWT_SECRET=.' "${PRODUCTION_ENV}"; then
-  echo "JWT_SECRET is missing or empty in Parameter Store."
+  echo "JWT_SECRET is missing or empty."
   exit 1
 fi
 
 if ! grep -q '^MONGO_URI=.' "${PRODUCTION_ENV}"; then
-  echo "MONGO_URI is missing or empty in Parameter Store."
+  echo "MONGO_URI is missing or empty."
   exit 1
 fi
 
-# Preserve the previous image configuration only if one exists.
 HAD_PREVIOUS_DEPLOYMENT=false
 
 if [[ -s "${ENV_FILE}" ]]; then
@@ -53,7 +51,6 @@ if [[ -s "${ENV_FILE}" ]]; then
   HAD_PREVIOUS_DEPLOYMENT=true
 fi
 
-# Authenticate EC2 with ECR using its instance role.
 echo "Authenticating with ECR..."
 
 aws ecr get-login-password --region "${AWS_REGION}" |
@@ -61,7 +58,6 @@ aws ecr get-login-password --region "${AWS_REGION}" |
     --username AWS \
     --password-stdin "${ECR_REGISTRY}"
 
-# Write immutable image references for this deployment.
 TEMP_ENV="$(mktemp "${DEPLOYMENT_DIR}/deployment.env.XXXXXX")"
 
 cat > "${TEMP_ENV}" <<EOF
@@ -72,25 +68,30 @@ ECR_SERVER_IMAGE=${ECR_REGISTRY}/mern-learning-server:release-${IMAGE_TAG}
 EOF
 
 chmod 600 "${TEMP_ENV}"
-mv "${TEMP_ENV}" "${ENV_FILE}"
 
+# Pull images before changing the active deployment configuration.
 echo "Pulling application images..."
 
-docker compose \
-  --env-file "${ENV_FILE}" \
+if ! docker compose \
+  --env-file "${TEMP_ENV}" \
   -f docker-compose.prod.yml \
-  pull
+  pull; then
+  echo "Image pull failed. Existing deployment remains unchanged."
+  rm -f "${TEMP_ENV}"
+  exit 1
+fi
+
+# Activate the new image configuration.
+mv "${TEMP_ENV}" "${ENV_FILE}"
 
 echo "Starting application..."
 
-docker compose \
+if docker compose \
   --env-file "${ENV_FILE}" \
   -f docker-compose.prod.yml \
-  up -d --remove-orphans
+  up -d --remove-orphans &&
+  bash deployment/scripts/health-check.sh; then
 
-echo "Checking application health..."
-
-if bash deployment/scripts/health-check.sh; then
   echo "Deployment ${IMAGE_TAG} succeeded."
   exit 0
 fi
@@ -98,7 +99,7 @@ fi
 echo "Deployment failed."
 
 if [[ "${HAD_PREVIOUS_DEPLOYMENT}" == "true" ]]; then
-  echo "Attempting rollback to previous images..."
+  echo "Attempting rollback..."
 
   if bash deployment/scripts/rollback.sh; then
     echo "Previous deployment restored."
@@ -106,7 +107,12 @@ if [[ "${HAD_PREVIOUS_DEPLOYMENT}" == "true" ]]; then
     echo "Rollback failed. Inspect Docker Compose logs."
   fi
 else
-  echo "No previous deployment exists. Automatic rollback is unavailable."
+  echo "No previous deployment exists. Stopping failed containers..."
+
+  docker compose \
+    --env-file "${ENV_FILE}" \
+    -f docker-compose.prod.yml \
+    down || true
 fi
 
 exit 1
