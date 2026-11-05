@@ -1,3 +1,4 @@
+
 provider "aws" {
   region = "eu-west-1"
 }
@@ -168,8 +169,6 @@ data "aws_iam_policy_document" "terraform_permissions" {
     actions = [
       "iam:CreateRole",
       "iam:DeleteRole",
-      "iam:DeleteRolePolicy",
-       "iam:PutRolePolicy",
       "iam:GetRole",
       "iam:UpdateAssumeRolePolicy",
       "iam:TagRole",
@@ -177,6 +176,14 @@ data "aws_iam_policy_document" "terraform_permissions" {
       "iam:AttachRolePolicy",
       "iam:DetachRolePolicy",
       "iam:ListAttachedRolePolicies",
+
+      # Inline IAM policy management
+      "iam:ListRolePolicies",
+      "iam:GetRolePolicy",
+      "iam:PutRolePolicy",
+      "iam:DeleteRolePolicy",
+
+      # Instance profile management
       "iam:CreateInstanceProfile",
       "iam:DeleteInstanceProfile",
       "iam:GetInstanceProfile",
