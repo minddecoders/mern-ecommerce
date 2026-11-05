@@ -1,6 +1,7 @@
 {
     "commands": [
         "set -e",
+        "git config --global --add safe.directory /opt/mern-ecommerce",
         "mkdir -p /opt/mern-ecommerce",
         "if [ ! -d /opt/mern-ecommerce/.git ]; then git clone https://github.com/minddecoders/mern-ecommerce.git /opt/mern-ecommerce; fi",
         "cd /opt/mern-ecommerce",
